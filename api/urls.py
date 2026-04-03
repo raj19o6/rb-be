@@ -7,8 +7,6 @@ from drf_yasg import openapi
 from api.User.view import UserViewset
 from api.Role.view import RoleViewset
 from api.Permission.view import PermissionViewset
-from api.TestAPI.view import TestViewset
-from api.Address.view import AddressViewset
 from api.ChangeMyPassword.view import ChangeMyPasswordView
 from api.ForgetPassword.view import PasswordResetRequestView
 from api.IsSuperUser.view import CheckUserType
@@ -18,8 +16,7 @@ router = DefaultRouter()
 router.register('user', UserViewset, basename='user')
 router.register('role', RoleViewset, basename='role')
 router.register('permission', PermissionViewset, basename='permission')
-router.register('test', TestViewset, basename='test')
-router.register('address', AddressViewset, basename='address')
+
 
 schema_view = get_schema_view(
     openapi.Info(title='API', default_version='v1'),

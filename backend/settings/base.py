@@ -113,5 +113,7 @@ EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
 
 STATIC_URL = os.environ.get('STATIC_URL', 'static/')
-STATICFILES_DIRS = [os.environ.get('STATICFILES_DIRS_PATH', '.')]
-STATIC_ROOT = os.environ.get('STATIC_ROOT', '.')
+STATIC_ROOT = os.path.join(BASE_DIR, os.environ.get('STATIC_ROOT', 'staticfiles'))
+_static_dirs_path = os.environ.get('STATICFILES_DIRS_PATH', '')
+if _static_dirs_path and os.path.abspath(_static_dirs_path) != os.path.abspath(str(STATIC_ROOT)):
+    STATICFILES_DIRS = [_static_dirs_path]
