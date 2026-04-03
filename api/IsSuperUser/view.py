@@ -7,5 +7,14 @@ class CheckUserType(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        user_type = 'superuser' if request.user.is_superuser else 'regular'
-        return Response({'user_type': user_type})
+        user = request.user
+        user_type = 'superuser' if user.is_superuser else 'regular'
+        roles = list(user.groups.values('id', 'name'))
+        permissions = list(
+            user.user_permissions.values('id', 'codename')
+        )
+        return Response({
+            'user_type': user_type,
+            'roles': roles,
+            'permissions': permissions
+        })

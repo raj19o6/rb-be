@@ -11,6 +11,7 @@ EXCLUDED_CONTENT_TYPES = [
 
 class PermissionViewset(ModelViewSet):
     serializer_class = PermissionSerializer
+    pagination_class = None
 
     def get_queryset(self):
         return Permission.objects.exclude(

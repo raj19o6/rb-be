@@ -6,5 +6,6 @@ class ApiConfig(AppConfig):
     name = 'api'
 
     def ready(self):
+        import api.User.model
         import api.UserProfile.model
-     
+        import api.HierarchyPermission.model
