@@ -4,6 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from api.User.serializers import UserSerializer
 from api.UserProfile.model import UserProfile
 from api.CustomRole.model import CustomRole
+from api.HierarchyPermission.model import UserPermissionAssignment
 
 
 class CreateUserAPI(APIView):
@@ -40,7 +41,14 @@ class CreateUserAPI(APIView):
             # Assign custom role permissions to user
             if custom_role:
                 for perm in custom_role.permissions.all():
+                    # Add to Django user permissions
                     user.user_permissions.add(perm)
+                    # Track in UserPermissionAssignment
+                    UserPermissionAssignment.objects.get_or_create(
+                        assigned_by=request.user,
+                        assigned_to=user,
+                        permission=perm
+                    )
 
             response_data = serializer.data
             response_data['custom_role'] = {
