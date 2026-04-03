@@ -16,8 +16,9 @@ ROLE_HIERARCHY = {
 
 def get_user_role(user):
     groups = list(user.groups.values_list('name', flat=True))
+    groups_lower = [g.lower() for g in groups]
     for role in ['manager', 'client', 'agent']:
-        if role in groups:
+        if role in groups_lower:
             return role
     return None
 
@@ -43,23 +44,30 @@ class AssignPermissionView(APIView):
         assigner_role = get_user_role(assigner)
         assignee_role = get_user_role(assignee)
 
-        # Validate role hierarchy
-        expected_assignee_role = ROLE_HIERARCHY.get(assigner_role)
-        if not expected_assignee_role or assignee_role != expected_assignee_role:
-            return Response(
-                {'error': f'You can only assign permissions to a {expected_assignee_role}.'},
-                status=403
-            )
+        # Superuser can assign to anyone
+        if not assigner.is_superuser:
+            # Validate role hierarchy
+            expected_assignee_role = ROLE_HIERARCHY.get(assigner_role)
+            if not expected_assignee_role or assignee_role != expected_assignee_role:
+                return Response(
+                    {
+                        'error': f'You can only assign permissions to a {expected_assignee_role}.',
+                        'your_role': assigner_role,
+                        'assignee_role': assignee_role,
+                        'assignee_username': assignee.username,
+                    },
+                    status=403
+                )
 
-        # Validate assigner owns these permissions (unless manager/superuser)
-        if not assigner.is_superuser and assigner_role != 'manager':
-            allowed_perm_ids = set(get_user_received_permissions(assigner))
-            for perm in permissions:
-                if perm.id not in allowed_perm_ids:
-                    return Response(
-                        {'error': f'You do not have permission "{perm.codename}" to assign.'},
-                        status=403
-                    )
+            # Validate assigner owns these permissions (all roles including manager)
+            if not assigner.is_superuser:
+                allowed_perm_ids = set(get_user_received_permissions(assigner))
+                for perm in permissions:
+                    if perm.id not in allowed_perm_ids:
+                        return Response(
+                            {'error': f'You do not have permission "{perm.codename}" to assign.'},
+                            status=403
+                        )
 
         # Assign permissions
         created = []
@@ -125,12 +133,15 @@ class MyTeamView(APIView):
         user = request.user
         role = get_user_role(user)
 
-        if role not in ROLE_HIERARCHY:
+        if not user.is_superuser and role not in ROLE_HIERARCHY:
             return Response({'error': 'You do not manage any users.'}, status=403)
 
         # Get users created by this user
         from api.UserProfile.model import UserProfile
-        created_profiles = UserProfile.objects.filter(created_by=user).select_related('user')
+        if user.is_superuser:
+            created_profiles = UserProfile.objects.all().select_related('user')
+        else:
+            created_profiles = UserProfile.objects.filter(created_by=user).select_related('user')
 
         team = []
         for profile in created_profiles:

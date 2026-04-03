@@ -17,12 +17,15 @@ from api.HierarchyPermission.view import (
     MyPermissionsView, MyTeamView, AssignmentListView
 )
 
+from api.CustomRole.view import CustomRoleViewset
+
 router = DefaultRouter()
 router.register('user', UserViewset, basename='user')
 router.register('role', RoleViewset, basename='role')
 router.register('permission', PermissionViewset, basename='permission')
 router.register('userprofile', UserProfileViewset, basename='userprofile')
 router.register('assignments', AssignmentListView, basename='assignments')
+router.register('customrole', CustomRoleViewset, basename='customrole')
 
 schema_view = get_schema_view(
     openapi.Info(title='API', default_version='v1'),

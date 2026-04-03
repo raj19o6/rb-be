@@ -9,3 +9,4 @@ class ApiConfig(AppConfig):
         import api.User.model
         import api.UserProfile.model
         import api.HierarchyPermission.model
+        import api.CustomRole.model

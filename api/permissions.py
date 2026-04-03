@@ -15,6 +15,13 @@ ALLOWED_GROUPS = {
     'CompanyUser'
 }
 
+# These endpoints are controlled by their own view-level logic
+BYPASS_ENDPOINTS = {
+    'assignpermission', 'revokepermission', 'mypermissions',
+    'myteam', 'assignments', 'issuperuser', 'changemypassword',
+    'passwordreset', 'createuser'
+}
+
 
 class CustomPermission(BasePermission):
     def has_permission(self, request, view):
@@ -29,16 +36,23 @@ class CustomPermission(BasePermission):
             return True
 
         resource = match.group(1).lower()
+
+        # Bypass custom endpoints — they handle their own permissions
+        if resource in BYPASS_ENDPOINTS:
+            return True
+
         method = request.method.upper()
         prefix = METHOD_PERMISSION_MAP.get(method, 'view_')
         codename = f"{prefix}{resource}"
 
-        from django.contrib.auth.models import Permission
-        perm_exists = Permission.objects.filter(codename=codename).exists()
+        # Check if user has explicit permission assigned
+        has_explicit = (
+            request.user.has_perm(f"auth.{codename}") or
+            request.user.has_perm(f"api.{codename}")
+        )
+        if has_explicit:
+            return True
 
-        if perm_exists:
-            return request.user.has_perm(f"auth.{codename}") or \
-                   request.user.has_perm(f"api.{codename}")
-
+        # Fall back to group membership check
         user_groups = set(request.user.groups.values_list('name', flat=True))
         return bool(user_groups & ALLOWED_GROUPS)
