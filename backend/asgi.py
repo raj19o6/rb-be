@@ -14,12 +14,12 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', settings_map.get(env, 'backend.s
 
 from django.core.asgi import get_asgi_application
 from channels.routing import ProtocolTypeRouter, URLRouter
-from channels.auth import AuthMiddlewareStack
+from api.Websocket.middleware import JwtAuthMiddleware
 import api.Websocket.routings
 
 application = ProtocolTypeRouter({
     'http': get_asgi_application(),
-    'websocket': AuthMiddlewareStack(
+    'websocket': JwtAuthMiddleware(
         URLRouter(api.Websocket.routings.websocket_urlpatterns)
     ),
 })

@@ -1,11 +1,16 @@
 ENV=local
 SECRET_KEY=<your-secret-key>
 BASE_URL=http://127.0.0.1:8000
-USER=<db_user>
+
+# Database configuration
+USER=postgres
 HOST=localhost
 PORT=5432
-DB=<db_name>
-PASS=<db_password>
+DB=db_backend
+PASS=Welcome@1
+
+
+# Email configuration
 EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
 EMAIL_HOST=smtp.hostinger.com
 EMAIL_PORT=587
@@ -16,3 +21,17 @@ STATIC_URL=static/
 STATICFILES_DIRS_PATH=.
 STATIC_ROOT=.
 PAGE_SIZE=10
+
+
+# Celery configuration
+CELERY_BROKER_URL=redis://localhost:6379/0
+VERIFY_SSL=false
+ACCESS_KEY=
+ENCRYPTION_KEY=
+LIMIT_FOR_BOT_RUN=10
+
+# Git configuration
+GIT_REPO_URL=
+GIT_USERNAME=
+GIT_PASSWORD=
+GIT_BASE_BRANCH=main

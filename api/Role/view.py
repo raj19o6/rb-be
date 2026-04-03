@@ -4,9 +4,8 @@ from api.Role.serializer import RoleSerializer
 
 # What roles each role can see/assign
 ROLE_VISIBILITY = {
-    'manager': ['client', 'agent'],
-    'client': ['agent'],
-    'agent': [],
+    'manager': ['client'],
+    'client': [],
 }
 
 
@@ -21,7 +20,7 @@ class RoleViewset(ModelViewSet):
 
         user_groups = list(user.groups.values_list('name', flat=True))
 
-        for role in ['manager', 'client', 'agent']:
+        for role in ['manager', 'client']:
             if role in user_groups:
                 visible = ROLE_VISIBILITY.get(role, [])
                 return Group.objects.filter(name__in=visible)
