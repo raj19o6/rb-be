@@ -16,8 +16,12 @@ class CheckUserType(APIView):
         for role in system_roles:
             role['type'] = 'system'
 
-        # Custom roles assigned to this user via permissions
-        custom_roles = CustomRole.objects.filter(created_by=user)
+        # Custom roles - show roles created by user OR roles whose permissions user has
+        from api.HierarchyPermission.model import UserPermissionAssignment
+        user_perm_ids = set(user.user_permissions.values_list('id', flat=True))
+        custom_roles = CustomRole.objects.filter(
+            permissions__id__in=user_perm_ids
+        ).distinct()
         custom_role_list = [
             {'id': str(r.id), 'name': r.name, 'type': 'custom'}
             for r in custom_roles
