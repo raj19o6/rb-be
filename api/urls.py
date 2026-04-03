@@ -54,6 +54,7 @@ from api.CustomApi.getBudget import GetBudget
 from api.CustomApi.manageMaintenanceReason import ManageMaintenanceReason
 from api.CustomApi.getRegexList import GetRegexList
 from api.CustomApi.getDocCategoriesWithDetails import GetDocCategoriesWithDetails
+from api.CustomApi.getDashboard import GetDashboard
 
 router = DefaultRouter()
 router.register('user', UserViewset, basename='user')
@@ -118,4 +119,5 @@ urlpatterns = [
     path('underMaintenance/', ManageMaintenanceReason.as_view()),
     path('getRegexList/', GetRegexList.as_view()),
     path('getDocCategoriesWithDetails/', GetDocCategoriesWithDetails.as_view()),
+    path('getDashboard/', GetDashboard.as_view()),
 ]
