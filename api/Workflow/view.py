@@ -84,12 +84,12 @@ class WorkflowReportView(APIView):
         report.status = data.get('status', 'completed')
         report.execution_time = data.get('execution_time')
         report.report_json = data.get('report', {})
-        report.html_report = data.get('html_report', '')
-        report.json_report = data.get('json_report', {})
+        report.html_report = data.get('report_html', '') or data.get('html_report', '')
+        report.json_report = data.get('report', {})
         report.executed_at = timezone.now()
 
         # Save HTML as a file stored under reports/<user_id>/<username>/
-        html_content = data.get('html_report', '')
+        html_content = data.get('report_html', '') or data.get('html_report', '')
         if html_content:
             from django.core.files.base import ContentFile
             user = workflow.created_by

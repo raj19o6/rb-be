@@ -3,10 +3,10 @@ SECRET_KEY=<your-secret-key>
 BASE_URL=http://127.0.0.1:8000
 
 # Database configuration
-USER=postgres
+DB_USER=raaj
 HOST=localhost
 PORT=5432
-DB=db_backend
+DB=db_richbot
 PASS=Welcome@1
 
 
@@ -22,6 +22,8 @@ STATICFILES_DIRS_PATH=.
 STATIC_ROOT=.
 PAGE_SIZE=10
 
+REDIS_HOST=localhost
+
 
 # Celery configuration
 CELERY_BROKER_URL=redis://localhost:6379/0
@@ -30,8 +32,11 @@ ACCESS_KEY=
 ENCRYPTION_KEY=
 LIMIT_FOR_BOT_RUN=10
 
-# Git configuration
-GIT_REPO_URL=
-GIT_USERNAME=
-GIT_PASSWORD=
-GIT_BASE_BRANCH=main
+
+
+JENKINS_URL=https://jenkins.btacode.com
+JENKINS_USER=admin
+JENKINS_TOKEN=111839648f57a7ce4e9406d820118377c7
+JENKINS_JOB=rb-bot-runner
+API_BASE_URL=https://lknpz8c6-8000.inc1.devtunnels.ms
+OPENAI_API_KEY=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

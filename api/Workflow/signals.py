@@ -86,7 +86,7 @@ JENKINS_URL = os.environ.get('JENKINS_URL', 'https://jenkins.btacode.com')
 JENKINS_USER = os.environ.get('JENKINS_USER', '')
 JENKINS_TOKEN = os.environ.get('JENKINS_TOKEN', '')
 JENKINS_JOB = os.environ.get('JENKINS_JOB', 'rb-bot-runner')
-API_BASE_URL = os.environ.get('API_BASE_URL', 'https://8nh48kbv-8000.inc1.devtunnels.ms')
+API_BASE_URL = os.environ.get('API_BASE_URL', 'https://lknpz8c6-8000.inc1.devtunnels.ms')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 
 
