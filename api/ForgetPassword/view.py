@@ -1,6 +1,6 @@
 import uuid
 import os
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.mail import send_mail
 from django.utils.encoding import force_bytes
@@ -15,6 +15,7 @@ class PasswordResetRequestView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        User = get_user_model()
         email = request.data.get('email')
         try:
             user = User.objects.get(email=email)
