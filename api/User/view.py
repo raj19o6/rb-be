@@ -11,7 +11,7 @@ class UserViewset(ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.is_superuser:
-            return User.objects.all()
+            return User.objects.filter(is_superuser=False)
         groups = [g.lower() for g in user.groups.values_list('name', flat=True)]
         if 'manager' in groups:
             return User.objects.filter(is_superuser=False)
