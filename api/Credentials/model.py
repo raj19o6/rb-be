@@ -18,7 +18,6 @@ class Credentials(models.Model):
 
     class Meta:
         db_table = 'api_credentials'
-        unique_together = ('bot', 'user')
 
     def __str__(self):
         return f"Credentials for {self.user.username} on {self.bot.name}"

@@ -13,6 +13,10 @@ class Workflow(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    bot = models.ForeignKey(
+        'api.Bot', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='workflows'
+    )
     workflow_name = models.CharField(max_length=255)
     session_id = models.CharField(max_length=255, unique=True)
     actions = models.JSONField()

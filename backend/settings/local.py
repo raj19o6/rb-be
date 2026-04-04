@@ -4,7 +4,7 @@ from .base import *
 
 load_dotenv()
 
-DEBUG = False
+DEBUG = True
 ALLOWED_HOSTS = ['*']
 BASE_URL = os.environ.get('BASE_URL', 'http://127.0.0.1:8000')
 

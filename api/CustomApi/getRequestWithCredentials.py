@@ -15,23 +15,38 @@ class CredentialInlineSerializer(serializers.ModelSerializer):
 
 class RequestWithCredentialsSerializer(serializers.ModelSerializer):
     requested_by_username = serializers.CharField(source='requested_by.username', read_only=True)
-    credentials = serializers.SerializerMethodField()
+    bot_name = serializers.CharField(source='bot.name', read_only=True)
+    credential = CredentialInlineSerializer(read_only=True)
 
     class Meta:
         model = Requests
-        fields = ['id', 'title', 'description', 'status', 'requested_by',
-                  'requested_by_username', 'credentials', 'created_at', 'updated_at']
-
-    def get_credentials(self, obj):
-        user = obj.requested_by
-        creds = Credentials.objects.filter(user=user).select_related('bot')
-        return CredentialInlineSerializer(creds, many=True).data
+        fields = [
+            'id', 'title', 'description', 'status',
+            'bot', 'bot_name',
+            'requested_by', 'requested_by_username',
+            'credential', 'created_at', 'updated_at'
+        ]
 
 
 class GetRequestWithCredentials(APIView):
     def get(self, request):
-        requests_qs = Requests.objects.filter(
-            requested_by=request.user
-        ).select_related('requested_by')
-        serializer = RequestWithCredentialsSerializer(requests_qs, many=True)
+        user = request.user
+        if user.is_superuser:
+            qs = Requests.objects.select_related(
+                'requested_by', 'bot', 'credential'
+            ).all()
+        else:
+            groups = [g.lower() for g in user.groups.values_list('name', flat=True)]
+            if 'manager' in groups:
+                from api.UserProfile.model import UserProfile
+                client_ids = UserProfile.objects.filter(created_by=user).values_list('user_id', flat=True)
+                qs = Requests.objects.select_related(
+                    'requested_by', 'bot', 'credential'
+                ).filter(requested_by_id__in=client_ids)
+            else:
+                qs = Requests.objects.select_related(
+                    'requested_by', 'bot', 'credential'
+                ).filter(requested_by=user)
+
+        serializer = RequestWithCredentialsSerializer(qs, many=True)
         return Response(serializer.data)

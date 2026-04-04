@@ -16,6 +16,10 @@ class Requests(models.Model):
     bot = models.ForeignKey(
         'api.Bot', on_delete=models.CASCADE, related_name='requests', null=True, blank=True
     )
+    credential = models.ForeignKey(
+        'api.Credentials', on_delete=models.SET_NULL,
+        related_name='requests', null=True, blank=True
+    )
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')

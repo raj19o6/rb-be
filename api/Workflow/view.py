@@ -16,7 +16,17 @@ class SaveWorkflowView(APIView):
 
     def post(self, request):
         data = request.data
+        bot_id = data.get('botId')
+
+        bot = None
+        if bot_id:
+            from api.Bot.model import Bot
+            bot = Bot.objects.filter(id=bot_id).first()
+            if not bot:
+                return Response({'error': 'Bot not found.'}, status=400)
+
         workflow = Workflow.objects.create(
+            bot=bot,
             workflow_name=data.get('workflowName'),
             session_id=data.get('sessionId'),
             actions=data.get('actions', []),
@@ -29,6 +39,8 @@ class SaveWorkflowView(APIView):
             'workflow_id': str(workflow.id),
             'user_id': str(request.user.id),
             'username': request.user.username,
+            'bot_id': str(bot.id) if bot else None,
+            'bot_name': bot.name if bot else None,
             'status': 'saved',
             'message': 'Workflow saved successfully'
         }, status=201)
@@ -55,14 +67,86 @@ class ExecuteWorkflowView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, workflow_id):
-        workflow = get_object_or_404(Workflow, id=workflow_id)
+        from api.BotAllotments.model import BotAllotments
+        from api.Billing.model import Billing
+        from api.Requests.model import Requests
+        from decimal import Decimal
+
+        workflow = get_object_or_404(Workflow, id=workflow_id, created_by=request.user)
+        user = request.user
+
+        # Block 1 — No bot linked to workflow
+        if not workflow.bot:
+            return Response({
+                'error': 'No bot linked to this workflow. Please select a bot before executing.',
+                'code': 'NO_BOT'
+            }, status=400)
+
+        bot = workflow.bot
+
+        # Block 2 — No approved request for this bot
+        approved_request = Requests.objects.filter(
+            requested_by=user, bot=bot, status='approved'
+        ).first()
+        if not approved_request:
+            pending = Requests.objects.filter(
+                requested_by=user, bot=bot, status='pending'
+            ).first()
+            if pending:
+                # Block 3 — Request pending
+                return Response({
+                    'error': f'Your request for {bot.name} is still pending approval. Please wait for manager approval.',
+                    'code': 'REQUEST_PENDING',
+                    'request_id': str(pending.id)
+                }, status=403)
+            return Response({
+                'error': f'You have not requested access to {bot.name}. Please submit a bot request first.',
+                'code': 'NO_REQUEST',
+                'next_step': 'POST /api/v1/requests/'
+            }, status=403)
+
+        # Block 4 — No paid billing
+        billing = Billing.objects.filter(
+            user=user, bot=bot, status='paid'
+        ).first()
+        if not billing:
+            unpaid = Billing.objects.filter(user=user, bot=bot, status='unpaid').first()
+            if unpaid:
+                return Response({
+                    'error': f'Bot access approved. Please complete payment to run {bot.name}.',
+                    'code': 'PAYMENT_REQUIRED',
+                    'billing_id': str(unpaid.id),
+                    'amount_due': str(unpaid.amount),
+                    'next_step': f'POST /api/v1/payment/'
+                }, status=402)
+            return Response({
+                'error': f'No billing found for {bot.name}. Please contact your manager.',
+                'code': 'NO_BILLING'
+            }, status=403)
+
+        # Block 5 — Insufficient balance
+        cost = Decimal(str(workflow.action_count)) * billing.price_per_action
+        if billing.balance_remaining < cost:
+            return Response({
+                'error': f'Insufficient balance to run this workflow.',
+                'code': 'INSUFFICIENT_BALANCE',
+                'required': str(cost),
+                'available': str(billing.balance_remaining),
+                'shortfall': str(cost - billing.balance_remaining),
+                'next_step': 'Please top up your billing.'
+            }, status=402)
+
+        # All checks passed — queue the workflow
         workflow.status = 'queued'
-        workflow.save(update_fields=['status'])  # signal fires here
+        workflow.save(update_fields=['status'])
 
         report, _ = WorkflowReport.objects.get_or_create(workflow=workflow)
         return Response({
             'status': 'queued',
             'execution_id': str(report.id),
+            'bot': bot.name,
+            'cost': str(cost),
+            'balance_after': str(billing.balance_remaining - cost),
             'message': 'Workflow queued. Jenkins job triggered automatically.'
         })
 
