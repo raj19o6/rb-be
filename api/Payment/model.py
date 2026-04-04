@@ -2,7 +2,7 @@ import uuid
 from django.db import models
 from django.conf import settings
 from api.Billing.model import Billing
-from api.Payment.validators import validate_positive_amount, validate_transaction_id
+from api.Payment.validators import validate_positive_amount
 
 
 class Payment(models.Model):
@@ -28,7 +28,7 @@ class Payment(models.Model):
         max_digits=10, decimal_places=2, validators=[validate_positive_amount]
     )
     transaction_id = models.CharField(
-        max_length=255, unique=True, validators=[validate_transaction_id]
+        max_length=255, unique=True, blank=True
     )
     method = models.CharField(max_length=20, choices=METHOD_CHOICES, default='online')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
@@ -37,6 +37,14 @@ class Payment(models.Model):
 
     class Meta:
         db_table = 'api_payment'
+
+    def save(self, *args, **kwargs):
+        if not self.transaction_id:
+            self.transaction_id = f"TXN-{uuid.uuid4().hex[:12].upper()}"
+        if self.status == 'completed' and not self.paid_at:
+            from django.utils import timezone
+            self.paid_at = timezone.now()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Payment {self.transaction_id} - {self.paid_by.username} ({self.status})"

@@ -12,4 +12,4 @@ class RequestsSerializer(serializers.ModelSerializer):
                   'requested_by', 'requested_by_username',
                   'assigned_to', 'assigned_to_username',
                   'created_at', 'updated_at']
-        read_only_fields = ['created_at', 'updated_at']
+        read_only_fields = ['requested_by', 'created_at', 'updated_at']

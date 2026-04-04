@@ -9,5 +9,6 @@ class BillingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Billing
         fields = ['id', 'user', 'username', 'bot', 'bot_name',
-                  'amount', 'status', 'billing_date', 'due_date', 'created_at']
-        read_only_fields = ['created_at']
+                  'amount', 'price_per_action', 'balance_remaining',
+                  'status', 'billing_date', 'due_date', 'created_at']
+        read_only_fields = ['balance_remaining', 'created_at']

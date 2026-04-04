@@ -119,3 +119,6 @@ STATIC_ROOT = os.path.join(BASE_DIR, os.environ.get('STATIC_ROOT', 'staticfiles'
 _static_dirs_path = os.environ.get('STATICFILES_DIRS_PATH', '')
 if _static_dirs_path and os.path.abspath(_static_dirs_path) != os.path.abspath(str(STATIC_ROOT)):
     STATICFILES_DIRS = [_static_dirs_path]
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

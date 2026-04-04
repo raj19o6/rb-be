@@ -41,4 +41,4 @@ from api.Bugs.history_model import BugsHistory
 # Notifications / Logs
 from api.Notification.model import Notification
 from api.APITestLogs.model import APITestLogs
-from api.Workflow.model import Workflow
+from api.Workflow.model import Workflow, WorkflowReport

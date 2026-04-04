@@ -55,3 +55,4 @@ class ApiConfig(AppConfig):
         import api.Budget.signals
         import api.Payment.signals
         import api.Executions.signals
+        import api.Workflow.signals

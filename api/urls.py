@@ -42,7 +42,10 @@ from api.Budget.view import BudgetViewset
 from api.Bugs.view import BugsViewset
 from api.Notification.view import NotificationViewset
 from api.APITestLogs.view import APITestLogsViewset
-from api.Workflow.view import WorkflowViewset
+from api.Workflow.view import (
+    SaveWorkflowView, DownloadWorkflowView, ExecuteWorkflowView,
+    WorkflowReportView, ListWorkflowsView, ServeHtmlReportView, ServeJsonReportView
+)
 
 from api.CustomApi.getBotAllotmentsByUser import GetBotAllotmentsByUser
 from api.CustomApi.getRequestsHistoryByUser import GetRequestsHistoryByUser
@@ -87,7 +90,6 @@ router.register('budget', BudgetViewset, basename='budget')
 router.register('bugs', BugsViewset, basename='bugs')
 router.register('notification', NotificationViewset, basename='notification')
 router.register('apitestlogs', APITestLogsViewset, basename='apitestlogs')
-router.register('workflow', WorkflowViewset, basename='workflow')
 
 schema_view = get_schema_view(
     openapi.Info(title='API', default_version='v1'),
@@ -122,4 +124,13 @@ urlpatterns = [
     path('getRegexList/', GetRegexList.as_view()),
     path('getDocCategoriesWithDetails/', GetDocCategoriesWithDetails.as_view()),
     path('getDashboard/', GetDashboard.as_view()),
+
+    # Workflow endpoints
+    path('workflows/save/', SaveWorkflowView.as_view()),
+    path('workflows/', ListWorkflowsView.as_view()),
+    path('workflows/<str:workflow_id>/download/', DownloadWorkflowView.as_view()),
+    path('workflows/<str:workflow_id>/execute/', ExecuteWorkflowView.as_view()),
+    path('workflows/<str:workflow_id>/report/', WorkflowReportView.as_view()),
+    path('workflows/<str:workflow_id>/report/html/', ServeHtmlReportView.as_view()),
+    path('workflows/<str:workflow_id>/report/json/', ServeJsonReportView.as_view()),
 ]

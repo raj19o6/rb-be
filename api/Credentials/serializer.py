@@ -10,5 +10,5 @@ class CredentialsSerializer(serializers.ModelSerializer):
         model = Credentials
         fields = ['id', 'bot', 'bot_name', 'user', 'username_display',
                   'username', 'password', 'extra_data', 'created_at', 'updated_at']
-        read_only_fields = ['created_at', 'updated_at']
+        read_only_fields = ['user', 'created_at', 'updated_at']
         extra_kwargs = {'password': {'write_only': True}}

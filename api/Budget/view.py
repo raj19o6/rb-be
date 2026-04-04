@@ -4,5 +4,10 @@ from api.Budget.serializer import BudgetSerializer
 
 
 class BudgetViewset(ModelViewSet):
-    queryset = Budget.objects.select_related('user', 'bot').all()
     serializer_class = BudgetSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser:
+            return Budget.objects.select_related('user', 'bot').all()
+        return Budget.objects.select_related('user', 'bot').filter(user=user)

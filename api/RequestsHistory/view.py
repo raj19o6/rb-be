@@ -4,5 +4,12 @@ from api.RequestsHistory.serializer import RequestsHistorySerializer
 
 
 class RequestsHistoryViewset(ModelViewSet):
-    queryset = RequestsHistory.objects.select_related('request', 'changed_by').all()
     serializer_class = RequestsHistorySerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser:
+            return RequestsHistory.objects.select_related('request', 'changed_by').all()
+        return RequestsHistory.objects.select_related('request', 'changed_by').filter(
+            request__requested_by=user
+        )

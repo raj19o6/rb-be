@@ -12,4 +12,4 @@ class ExecutionsSerializer(serializers.ModelSerializer):
         fields = ['id', 'bot', 'bot_name', 'request', 'request_title',
                   'executed_by', 'executed_by_username', 'status',
                   'started_at', 'ended_at', 'created_at']
-        read_only_fields = ['created_at']
+        read_only_fields = ['executed_by', 'status', 'started_at', 'ended_at', 'created_at']

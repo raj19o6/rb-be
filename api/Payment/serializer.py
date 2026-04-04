@@ -10,4 +10,4 @@ class PaymentSerializer(serializers.ModelSerializer):
         model = Payment
         fields = ['id', 'billing', 'billing_status', 'paid_by', 'paid_by_username',
                   'amount', 'transaction_id', 'method', 'status', 'paid_at', 'created_at']
-        read_only_fields = ['created_at']
+        read_only_fields = ['transaction_id', 'paid_at', 'created_at']

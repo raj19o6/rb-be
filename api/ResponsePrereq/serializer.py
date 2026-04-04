@@ -10,4 +10,4 @@ class ResponsePrereqSerializer(serializers.ModelSerializer):
         model = ResponsePrereq
         fields = ['id', 'bot', 'bot_name', 'user', 'username',
                   'key', 'value', 'created_at', 'updated_at']
-        read_only_fields = ['created_at', 'updated_at']
+        read_only_fields = ['user', 'created_at', 'updated_at']
