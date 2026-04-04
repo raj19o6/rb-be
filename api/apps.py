@@ -49,6 +49,7 @@ class ApiConfig(AppConfig):
         # Notifications / Logs
         import api.Notification.model
         import api.APITestLogs.model
+        import api.Workflow.model
 
         # Signals
         import api.Budget.signals

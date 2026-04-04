@@ -1,9 +1,8 @@
 from django.urls import path
-from rest_framework_simplejwt.views import TokenObtainPairView
-from security.views import CustomTokenRefreshView, PasswordResetConfirmView
+from security.views import CustomTokenObtainPairView, CustomTokenRefreshView, PasswordResetConfirmView
 
 urlpatterns = [
-    path('token/', TokenObtainPairView.as_view()),
+    path('token/', CustomTokenObtainPairView.as_view()),
     path('token/refresh/', CustomTokenRefreshView.as_view()),
     path('pass-reset/<str:temp_token>/', PasswordResetConfirmView.as_view()),
 ]
