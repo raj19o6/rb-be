@@ -44,7 +44,7 @@ from api.Notification.view import NotificationViewset
 from api.APITestLogs.view import APITestLogsViewset
 from api.Workflow.view import (
     SaveWorkflowView, DownloadWorkflowView, ExecuteWorkflowView,
-    WorkflowReportView, ListWorkflowsView, ServeHtmlReportView, ServeJsonReportView
+    WorkflowReportView, WorkflowDetailView, ListWorkflowsView
 )
 
 from api.CustomApi.getBotAllotmentsByUser import GetBotAllotmentsByUser
@@ -128,9 +128,8 @@ urlpatterns = [
     # Workflow endpoints
     path('workflows/save/', SaveWorkflowView.as_view()),
     path('workflows/', ListWorkflowsView.as_view()),
+    path('workflows/<str:workflow_id>/', WorkflowDetailView.as_view()),
     path('workflows/<str:workflow_id>/download/', DownloadWorkflowView.as_view()),
     path('workflows/<str:workflow_id>/execute/', ExecuteWorkflowView.as_view()),
     path('workflows/<str:workflow_id>/report/', WorkflowReportView.as_view()),
-    path('workflows/<str:workflow_id>/report/html/', ServeHtmlReportView.as_view()),
-    path('workflows/<str:workflow_id>/report/json/', ServeJsonReportView.as_view()),
 ]

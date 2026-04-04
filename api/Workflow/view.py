@@ -108,9 +108,40 @@ class WorkflowReportView(APIView):
         })
 
     def get(self, request, workflow_id):
-        """User views report in dashboard"""
+        """User views report — ?format=html or ?format=json or default summary"""
         workflow = get_object_or_404(Workflow, id=workflow_id)
-        report = get_object_or_404(WorkflowReport, workflow=workflow)
+        report = WorkflowReport.objects.filter(workflow=workflow).first()
+
+        if not report:
+            return Response({
+                'workflow_id': str(workflow.id),
+                'workflow_name': workflow.workflow_name,
+                'status': workflow.status,
+                'message': 'Report not available yet. Workflow has not been executed.'
+            }, status=200)
+
+        fmt = request.query_params.get('format')
+
+        if fmt == 'html':
+            if not report.html_report_file:
+                return Response({'error': 'HTML report not available yet.'}, status=404)
+            from django.http import FileResponse
+            return FileResponse(
+                report.html_report_file.open('rb'),
+                content_type='text/html',
+                filename=f"{workflow.created_by.username}_{workflow.id}.html"
+            )
+
+        if fmt == 'json':
+            if not report.json_report:
+                return Response({'error': 'JSON report not available yet.'}, status=404)
+            return Response({
+                'workflow_id': str(workflow.id),
+                'workflow_name': workflow.workflow_name,
+                'user_id': str(workflow.created_by.id),
+                'username': workflow.created_by.username,
+                'report': report.json_report,
+            })
 
         summary = report.report_json.get('summary', {}) if report.report_json else {}
         total = summary.get('total', 0)
@@ -125,13 +156,58 @@ class WorkflowReportView(APIView):
             'status': report.status,
             'executed_at': report.executed_at,
             'execution_time': report.execution_time,
+            'report': report.report_json,
+            'html_report': report.html_report,
+            'json_report': report.json_report,
             'summary': {
                 **summary,
                 'success_rate': success_rate,
             },
             'html_report_url': request.build_absolute_uri(report.html_report_file.url) if report.html_report_file else None,
-            'json_report_url': f"{API_BASE_URL}/api/v1/workflows/{workflow.id}/report/json/",
+            'json_report_url': f"{request.build_absolute_uri(f'/api/v1/workflows/{workflow.id}/report/')}?format=json",
         })
+
+
+class WorkflowDetailView(APIView):
+    """GET, PATCH, DELETE /api/v1/workflows/<id>/"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, workflow_id):
+        workflow = get_object_or_404(Workflow, id=workflow_id, created_by=request.user)
+        report = WorkflowReport.objects.filter(workflow=workflow).first()
+        return Response({
+            'id': str(workflow.id),
+            'name': workflow.workflow_name,
+            'user_id': str(workflow.created_by.id),
+            'username': workflow.created_by.username,
+            'session_id': workflow.session_id,
+            'actions': workflow.actions,
+            'metadata': workflow.metadata,
+            'recorded_at': workflow.recorded_at,
+            'action_count': workflow.action_count,
+            'status': workflow.status,
+            'last_executed': workflow.last_executed,
+            'created_at': workflow.created_at,
+            'has_report': report is not None,
+        })
+
+    def patch(self, request, workflow_id):
+        workflow = get_object_or_404(Workflow, id=workflow_id, created_by=request.user)
+        data = request.data
+        if 'workflowName' in data:
+            workflow.workflow_name = data['workflowName']
+        if 'actions' in data:
+            workflow.actions = data['actions']
+            workflow.action_count = len(data['actions'])
+        if 'metadata' in data:
+            workflow.metadata = data['metadata']
+        workflow.save()
+        return Response({'message': 'Workflow updated.', 'id': str(workflow.id)})
+
+    def delete(self, request, workflow_id):
+        workflow = get_object_or_404(Workflow, id=workflow_id, created_by=request.user)
+        workflow.delete()
+        return Response({'message': 'Workflow deleted.'}, status=204)
 
 
 class ListWorkflowsView(APIView):
@@ -173,41 +249,3 @@ class ListWorkflowsView(APIView):
 
         return Response({'workflows': workflows})
 
-
-class ServeHtmlReportView(APIView):
-    """GET /api/v1/workflows/<id>/report/html/ — Serve HTML report file"""
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request, workflow_id):
-        workflow = get_object_or_404(Workflow, id=workflow_id)
-        report = get_object_or_404(WorkflowReport, workflow=workflow)
-
-        if not report.html_report_file:
-            return Response({'error': 'HTML report not available yet.'}, status=404)
-
-        from django.http import FileResponse
-        return FileResponse(
-            report.html_report_file.open('rb'),
-            content_type='text/html',
-            filename=f"{workflow.created_by.username}_{workflow.id}.html"
-        )
-
-
-class ServeJsonReportView(APIView):
-    """GET /api/v1/workflows/<id>/report/json/ — Serve JSON report"""
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request, workflow_id):
-        workflow = get_object_or_404(Workflow, id=workflow_id)
-        report = get_object_or_404(WorkflowReport, workflow=workflow)
-
-        if not report.json_report:
-            return Response({'error': 'JSON report not available yet.'}, status=404)
-
-        return Response({
-            'workflow_id': str(workflow.id),
-            'workflow_name': workflow.workflow_name,
-            'user_id': str(workflow.created_by.id),
-            'username': workflow.created_by.username,
-            'report': report.json_report,
-        })

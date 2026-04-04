@@ -4,7 +4,7 @@ from api.run_job import trigger_jenkins_job
 
 JENKINS_URL = "https://jenkins.btacode.com"
 JENKINS_USER = "admin"
-JENKINS_TOKEN = "11b3055ae791242c922e9fa74345b30bd4"
+JENKINS_TOKEN = "111839648f57a7ce4e9406d820118377c7"
 
 job_url = f"{JENKINS_URL}/job/rb-bot-runner"
 params = {
