@@ -5,10 +5,14 @@ from django.core.cache import cache
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
-from rest_framework_simplejwt.views import TokenRefreshView
-from security.serializers import CustomTokenRefreshSerializer
+from rest_framework_simplejwt.views import TokenRefreshView, TokenObtainPairView
+from security.serializers import CustomTokenRefreshSerializer, CustomTokenObtainPairSerializer
 
 User = get_user_model()
+
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
 
 
 class CustomTokenRefreshView(TokenRefreshView):

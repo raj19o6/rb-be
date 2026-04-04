@@ -10,14 +10,13 @@ User = get_user_model()
 
 ROLE_HIERARCHY = {
     'manager': 'client',
-    'client': 'agent',
 }
 
 
 def get_user_role(user):
     groups = list(user.groups.values_list('name', flat=True))
     groups_lower = [g.lower() for g in groups]
-    for role in ['manager', 'client', 'agent']:
+    for role in ['manager', 'client']:
         if role in groups_lower:
             return role
     return None
