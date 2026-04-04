@@ -39,9 +39,9 @@ def trigger_jenkins_job(job_url, params=None, auth=None):
     url = f"{job_url.rstrip('/')}/buildWithParameters" if params else f"{job_url.rstrip('/')}/build"
 
     try:
-        response = session.post(url, params=params or {}, auth=auth)
+        response = session.post(url, params=params or {}, auth=auth, allow_redirects=False)
         return {
-            'success': response.status_code in (200, 201),
+            'success': response.status_code in (200, 201, 302),
             'status_code': response.status_code,
             'error': None,
         }

@@ -28,8 +28,8 @@ class Billing(models.Model):
         db_table = 'api_billing'
 
     def save(self, *args, **kwargs):
-        # On first save (new record), set balance_remaining = amount
-        if not self.pk and self.balance_remaining == 0:
+        # On first save (new record), always set balance_remaining = amount
+        if not self.pk:
             self.balance_remaining = self.amount
         super().save(*args, **kwargs)
 
