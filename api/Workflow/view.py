@@ -219,6 +219,13 @@ class ListWorkflowsView(APIView):
         qs = Workflow.objects.select_related('report').all() if user.is_superuser \
             else Workflow.objects.select_related('report').filter(created_by=user)
 
+        # Manager sees all client workflows
+        groups = [g.lower() for g in user.groups.values_list('name', flat=True)]
+        if not user.is_superuser and 'manager' in groups:
+            from api.UserProfile.model import UserProfile
+            client_ids = UserProfile.objects.filter(created_by=user).values_list('user_id', flat=True)
+            qs = Workflow.objects.select_related('report').filter(created_by_id__in=client_ids)
+
         workflows = []
         for wf in qs.order_by('-created_at'):
             summary = {}

@@ -1,4 +1,6 @@
 from rest_framework.viewsets import ModelViewSet
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from api.Bot.model import Bot
 from api.Bot.serializer import BotSerializer
@@ -19,6 +21,13 @@ class BotViewset(ModelViewSet):
         return Bot.objects.select_related('created_by').filter(
             allotments__user=user
         ).distinct()
+
+    @action(detail=False, methods=['get'], url_path='available')
+    def available(self, request):
+        """All active bots — clients use this to browse and request bots"""
+        bots = Bot.objects.filter(status='active').select_related('created_by')
+        serializer = self.get_serializer(bots, many=True)
+        return Response(serializer.data)
 
     def http_method_not_allowed(self, request, *args, **kwargs):
         user = request.user

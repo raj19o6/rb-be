@@ -13,9 +13,13 @@ class Requests(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    bot = models.ForeignKey(
+        'api.Bot', on_delete=models.CASCADE, related_name='requests', null=True, blank=True
+    )
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    rejection_reason = models.TextField(blank=True, null=True)
     requested_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='requests'
     )

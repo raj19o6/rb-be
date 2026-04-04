@@ -12,6 +12,13 @@ class ExecutionsViewset(ModelViewSet):
         user = self.request.user
         if user.is_superuser:
             return Executions.objects.select_related('bot', 'request', 'executed_by').all()
+        groups = [g.lower() for g in user.groups.values_list('name', flat=True)]
+        if 'manager' in groups:
+            from api.UserProfile.model import UserProfile
+            client_ids = UserProfile.objects.filter(created_by=user).values_list('user_id', flat=True)
+            return Executions.objects.select_related('bot', 'request', 'executed_by').filter(
+                executed_by_id__in=client_ids
+            )
         return Executions.objects.select_related('bot', 'request', 'executed_by').filter(
             executed_by=user
         )
