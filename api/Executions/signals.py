@@ -6,20 +6,24 @@ from decimal import Decimal
 
 @receiver(post_save, sender='api.Executions')
 def handle_execution_created(sender, instance, created, **kwargs):
-    if created:
+    """Only run legacy workflow-trigger check when execution was created
+    manually via POST /executions/ (no request linked = old path).
+    ExecuteWorkflowView already handles all checks before creating the record,
+    so skip this entirely when a request is linked."""
+    if created and instance.request is None:
         _check_and_trigger_workflow(instance)
 
 
 @receiver(post_save, sender='api.Executions')
 def handle_execution_completion(sender, instance, created, **kwargs):
-    if instance.status in ('success', 'failed') and not created:
+    if instance.status in ('success', 'failed', 'cancelled') and not created:
         from api.ExecutionReports.model import ExecutionReports
         ExecutionReports.objects.get_or_create(
             execution=instance,
             defaults={
                 'summary': f'Execution {instance.status}.',
                 'logs': '',
-                'error_message': '' if instance.status == 'success' else 'Execution failed.',
+                'error_message': '' if instance.status == 'success' else f'Execution {instance.status}.',
             }
         )
 
@@ -70,25 +74,29 @@ def _check_and_trigger_workflow(execution):
 
 
 def _deduct_balance(execution):
-    """Deduct action cost from billing balance after successful execution"""
+    """Deduct action cost from billing balance after successful execution."""
     from api.Billing.model import Billing
     from api.Workflow.model import Workflow
-    from django.db.models import F
 
     billing = Billing.objects.filter(
         user=execution.executed_by,
         bot=execution.bot,
         status='paid'
     ).first()
-
     if not billing:
         return
 
-    # Get the workflow that was just executed
+    # Find workflow via execution_id stored in metadata (set by ExecuteWorkflowView)
     workflow = Workflow.objects.filter(
-        created_by=execution.executed_by,
-        status__in=['queued', 'running', 'completed']
-    ).order_by('-updated_at').first()
+        metadata__execution_id=str(execution.id)
+    ).first()
+
+    # Fallback: most recently updated completed workflow for this user
+    if not workflow:
+        workflow = Workflow.objects.filter(
+            created_by=execution.executed_by,
+            status='completed'
+        ).order_by('-updated_at').first()
 
     if not workflow:
         return
@@ -96,6 +104,10 @@ def _deduct_balance(execution):
     cost = Decimal(str(workflow.action_count)) * billing.price_per_action
     billing.balance_remaining = max(Decimal('0'), billing.balance_remaining - cost)
     billing.save(update_fields=['balance_remaining'])
+
+    # Store cost on the execution report
+    from api.ExecutionReports.model import ExecutionReports
+    ExecutionReports.objects.filter(execution=execution).update(total_price=cost)
 
 
 def _fail_execution(execution, reason):

@@ -127,11 +127,11 @@ urlpatterns = [
     path('getDocCategoriesWithDetails/', GetDocCategoriesWithDetails.as_view()),
     path('getDashboard/', GetDashboard.as_view()),
 
-    # Workflow endpoints
+    # Workflow endpoints — specific paths MUST come before <str:workflow_id> wildcard
     path('workflows/save/', SaveWorkflowView.as_view()),
     path('workflows/', ListWorkflowsView.as_view()),
-    path('workflows/<str:workflow_id>/', WorkflowDetailView.as_view()),
     path('workflows/<str:workflow_id>/download/', DownloadWorkflowView.as_view()),
     path('workflows/<str:workflow_id>/execute/', ExecuteWorkflowView.as_view()),
     path('workflows/<str:workflow_id>/report/', WorkflowReportView.as_view()),
+    path('workflows/<str:workflow_id>/', WorkflowDetailView.as_view()),
 ]
