@@ -74,6 +74,8 @@ class GetDashboard(APIView):
             },
         }
 
+        # ── Budget ───────────────────────────────────────────────────────────
+        budget_qs = Budget.objects.all() if is_super else Budget.objects.filter(user=user)
         budget_agg = budget_qs.aggregate(
             total_allocated=Sum('allocated_amount'),
             total_consumed=Sum('consumed_amount'),
