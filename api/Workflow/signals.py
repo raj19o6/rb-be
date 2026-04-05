@@ -30,7 +30,7 @@ def trigger_jenkins_on_queued(sender, instance, created, **kwargs):
     auth = (JENKINS_USER, JENKINS_TOKEN) if JENKINS_USER and JENKINS_TOKEN else None
 
     print(f"🚀 Triggering Jenkins job: {job_url}")
-    print(f"📦 Parameters: { {k: v for k, v in params.items() if k != 'OPENAI_API_KEY'} }")
+    print(f"📦 Parameters: { {k: v for k, v in params.items() if k != 'GROQ_API_KEY'} }")
     print(f"🔑 Auth user: {JENKINS_USER if JENKINS_USER else 'None'}")
 
     result = trigger_jenkins_job(job_url, params=params, auth=auth)
