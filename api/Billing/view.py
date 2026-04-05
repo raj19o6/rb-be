@@ -58,9 +58,11 @@ class BillingViewset(ModelViewSet):
 
         billing = Billing.objects.filter(user=target_user, bot=None, status='paid').first()
         if billing:
-            billing.balance_remaining = F('balance_remaining') + Decimal(str(amount))
-            billing.amount            = F('amount') + Decimal(str(amount))
-            billing.save(update_fields=['balance_remaining', 'amount'])
+            # Only top up balance_remaining, never mutate the original amount
+            from django.db.models import F
+            Billing.objects.filter(pk=billing.pk).update(
+                balance_remaining=F('balance_remaining') + Decimal(str(amount))
+            )
             billing.refresh_from_db()
         else:
             billing = Billing.objects.create(
