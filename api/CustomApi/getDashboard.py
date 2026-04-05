@@ -1,9 +1,11 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django.db.models import Sum, Q
+from django.db.models import Sum, Count, Q, F
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.utils import timezone
+
 from api.Bot.model import Bot
 from api.BotAllotments.model import BotAllotments
 from api.Executions.model import Executions
@@ -13,6 +15,7 @@ from api.Bugs.model import Bugs
 from api.Requests.model import Requests
 from api.Notification.model import Notification
 from api.CustomRole.model import CustomRole
+from api.Workflow.model import Workflow, WorkflowReport
 
 
 class GetDashboard(APIView):
@@ -22,93 +25,283 @@ class GetDashboard(APIView):
         user = request.user
         is_super = user.is_superuser
 
-        # --- Users & Roles (superuser only) ---
+        # ── Users & Roles (superuser only) ───────────────────────────────────
         users_roles = None
         if is_super:
             User = get_user_model()
             user_qs = User.objects.all()
             users_roles = {
                 "users": {
-                    "total": user_qs.count(),
-                    "active": user_qs.filter(is_active=True).count(),
-                    "inactive": user_qs.filter(is_active=False).count(),
+                    "total":      user_qs.count(),
+                    "active":     user_qs.filter(is_active=True).count(),
+                    "inactive":   user_qs.filter(is_active=False).count(),
                     "superusers": user_qs.filter(is_superuser=True).count(),
                 },
                 "roles": {
                     "system_roles": Group.objects.count(),
                     "custom_roles": CustomRole.objects.count(),
-                    "total": Group.objects.count() + CustomRole.objects.count(),
+                    "total":        Group.objects.count() + CustomRole.objects.count(),
                 },
             }
 
-        # --- Bots ---
-        bot_qs = Bot.objects.all() if is_super else Bot.objects.filter(
-            allotments__user=user
+        # ── Bots ─────────────────────────────────────────────────────────────
+        # FIX: use correct related_name 'allotments' confirmed from BotAllotments model
+        bot_qs = Bot.objects.all() if is_super else Bot.objects.filter(allotments__user=user).distinct()
+        bot_status = bot_qs.aggregate(
+            active=Count('id', filter=Q(status='active')),
+            inactive=Count('id', filter=Q(status='inactive')),
+            maintenance=Count('id', filter=Q(status='maintenance')),
         )
-        bots = {
-            "total": bot_qs.count(),
-            "active": bot_qs.filter(status='active').count(),
-            "inactive": bot_qs.filter(status='inactive').count(),
-            "maintenance": bot_qs.filter(status='maintenance').count(),
-        }
+        bots = {"total": bot_qs.count(), **bot_status}
 
-        # --- Executions ---
-        exec_qs = Executions.objects.all() if is_super else Executions.objects.filter(executed_by=user)
-        exec_counts = {s: exec_qs.filter(status=s).count() for s in ['success', 'failed', 'running', 'queued', 'cancelled']}
-        executions = {"total": exec_qs.count(), **exec_counts}
+        # ── Executions ───────────────────────────────────────────────────────
+        # FIX: scope by allotted bots for regular users, not just executed_by
+        exec_qs = (
+            Executions.objects.all() if is_super
+            else Executions.objects.filter(
+                Q(executed_by=user) | Q(bot__allotments__user=user)
+            ).distinct()
+        )
+        exec_agg = exec_qs.aggregate(
+            success=Count('id', filter=Q(status='success')),
+            failed=Count('id', filter=Q(status='failed')),
+            running=Count('id', filter=Q(status='running')),
+            queued=Count('id', filter=Q(status='queued')),
+            cancelled=Count('id', filter=Q(status='cancelled')),
+        )
+        executions = {"total": exec_qs.count(), **exec_agg}
 
-        # --- Budget ---
+        # ── Budget ───────────────────────────────────────────────────────────
         budget_qs = Budget.objects.all() if is_super else Budget.objects.filter(user=user)
         budget_agg = budget_qs.aggregate(
             total_allocated=Sum('allocated_amount'),
             total_consumed=Sum('consumed_amount'),
         )
+        allocated = budget_agg['total_allocated'] or 0
+        consumed  = budget_agg['total_consumed'] or 0
         budget = {
-            "total_allocated": budget_agg['total_allocated'] or 0,
-            "total_consumed": budget_agg['total_consumed'] or 0,
-            "total_remaining": (budget_agg['total_allocated'] or 0) - (budget_agg['total_consumed'] or 0),
+            "total_allocated": float(allocated),
+            "total_consumed":  float(consumed),
+            "total_remaining": float(allocated - consumed),
         }
 
-        # --- Billing ---
+        # ── Billing ──────────────────────────────────────────────────────────
+        # FIX: single query with conditional aggregation instead of 3 separate queries
         billing_qs = Billing.objects.all() if is_super else Billing.objects.filter(user=user)
-        billing_agg = billing_qs.aggregate(total=Sum('amount'))
-        billing = {
-            "total_amount": billing_agg['total'] or 0,
-            **{s: billing_qs.filter(status=s).aggregate(a=Sum('amount'))['a'] or 0 for s in ['paid', 'unpaid', 'overdue']},
+        billing_agg = billing_qs.aggregate(
+            total_amount=Sum('amount'),
+            paid=Sum('amount', filter=Q(status='paid')),
+            unpaid=Sum('amount', filter=Q(status='unpaid')),
+            overdue=Sum('amount', filter=Q(status='overdue')),
+            total_balance_remaining=Sum('balance_remaining'),
+        )
+        billing = {k: float(v) if v else 0 for k, v in billing_agg.items()}
+
+        # ── Bugs ─────────────────────────────────────────────────────────────
+        # FIX: include all statuses for full picture
+        bugs_qs = Bugs.objects.all() if is_super else Bugs.objects.filter(
+            Q(reported_by=user) | Q(assigned_to=user)
+        )
+        bugs_agg = bugs_qs.aggregate(
+            open=Count('id', filter=Q(status='open')),
+            in_progress=Count('id', filter=Q(status='in_progress')),
+            resolved=Count('id', filter=Q(status='resolved')),
+            closed=Count('id', filter=Q(status='closed')),
+            low=Count('id', filter=Q(severity='low', status__in=['open', 'in_progress'])),
+            medium=Count('id', filter=Q(severity='medium', status__in=['open', 'in_progress'])),
+            high=Count('id', filter=Q(severity='high', status__in=['open', 'in_progress'])),
+            critical=Count('id', filter=Q(severity='critical', status__in=['open', 'in_progress'])),
+        )
+        bugs = {
+            "total": bugs_qs.count(),
+            "by_status": {
+                "open":        bugs_agg['open'],
+                "in_progress": bugs_agg['in_progress'],
+                "resolved":    bugs_agg['resolved'],
+                "closed":      bugs_agg['closed'],
+            },
+            "open_by_severity": {
+                "low":      bugs_agg['low'],
+                "medium":   bugs_agg['medium'],
+                "high":     bugs_agg['high'],
+                "critical": bugs_agg['critical'],
+            },
+            "total_open": bugs_agg['open'] + bugs_agg['in_progress'],
         }
 
-        # --- Bugs ---
-        bugs_qs = Bugs.objects.filter(status__in=['open', 'in_progress']) if is_super else \
-            Bugs.objects.filter(status__in=['open', 'in_progress']).filter(
-                Q(reported_by=user) | Q(assigned_to=user)
-            )
-        open_bugs = {sev: bugs_qs.filter(severity=sev).count() for sev in ['low', 'medium', 'high', 'critical']}
-        bugs = {"open": open_bugs, "total_open": bugs_qs.count()}
-
-        # --- Requests ---
-        req_qs = Requests.objects.all() if is_super else Requests.objects.filter(requested_by=user)
-        req_counts = {s: req_qs.filter(status=s).count() for s in ['pending', 'approved', 'in_progress', 'completed', 'rejected']}
-        requests_data = {"total": req_qs.count(), **req_counts}
-
-        # --- Notifications (always scoped to current user) ---
-        notif_qs = Notification.objects.filter(user=user)
-        recent_notifs = notif_qs.order_by('-created_at')[:5].values(
-            'id', 'title', 'message', 'notification_type', 'created_at'
+        # ── Requests ─────────────────────────────────────────────────────────
+        req_qs = Requests.objects.all() if is_super else Requests.objects.filter(
+            Q(requested_by=user) | Q(assigned_to=user)
         )
+        req_agg = req_qs.aggregate(
+            pending=Count('id', filter=Q(status='pending')),
+            approved=Count('id', filter=Q(status='approved')),
+            in_progress=Count('id', filter=Q(status='in_progress')),
+            completed=Count('id', filter=Q(status='completed')),
+            rejected=Count('id', filter=Q(status='rejected')),
+        )
+        requests_data = {"total": req_qs.count(), **req_agg}
+
+        # ── Workflows ────────────────────────────────────────────────────────
+        wf_qs = Workflow.objects.all() if is_super else Workflow.objects.filter(created_by=user)
+
+        wf_agg = wf_qs.aggregate(
+            saved=Count('id', filter=Q(status='saved')),
+            queued=Count('id', filter=Q(status='queued')),
+            running=Count('id', filter=Q(status='running')),
+            completed=Count('id', filter=Q(status='completed')),
+            failed=Count('id', filter=Q(status='failed')),
+            total_actions=Sum('action_count'),
+        )
+
+        # Workflows per bot (with bot name + client/owner)
+        wf_by_bot = (
+            wf_qs
+            .values(
+                'bot__id',
+                'bot__name',
+                'bot__status',
+                'bot__created_by__id',
+                'bot__created_by__username',
+                'bot__created_by__email',
+            )
+            .annotate(
+                workflow_count=Count('id'),
+                completed=Count('id', filter=Q(status='completed')),
+                failed=Count('id', filter=Q(status='failed')),
+                total_actions=Sum('action_count'),
+            )
+            .order_by('-workflow_count')
+        )
+
+        # Workflows per client (created_by user)
+        wf_by_client = (
+            wf_qs
+            .values(
+                'created_by__id',
+                'created_by__username',
+                'created_by__email',
+            )
+            .annotate(
+                workflow_count=Count('id'),
+                completed=Count('id', filter=Q(status='completed')),
+                failed=Count('id', filter=Q(status='failed')),
+                saved=Count('id', filter=Q(status='saved')),
+                total_actions=Sum('action_count'),
+            )
+            .order_by('-workflow_count')
+        )
+
+        # Recent workflows with report status
+        recent_workflows = list(
+            wf_qs
+            .select_related('bot', 'created_by', 'report')
+            .order_by('-created_at')[:10]
+            .values(
+                'id',
+                'workflow_name',
+                'status',
+                'action_count',
+                'last_executed',
+                'created_at',
+                'bot__id',
+                'bot__name',
+                'created_by__id',
+                'created_by__username',
+                'created_by__email',
+                'report__status',
+                'report__execution_time',
+                'report__executed_at',
+            )
+        )
+
+        workflows = {
+            "total": wf_qs.count(),
+            "by_status": {
+                "saved":     wf_agg['saved'],
+                "queued":    wf_agg['queued'],
+                "running":   wf_agg['running'],
+                "completed": wf_agg['completed'],
+                "failed":    wf_agg['failed'],
+            },
+            "total_actions_recorded": wf_agg['total_actions'] or 0,
+            "by_bot": [
+                {
+                    "bot_id":       str(r['bot__id']) if r['bot__id'] else None,
+                    "bot_name":     r['bot__name'] or "Unassigned",
+                    "bot_status":   r['bot__status'],
+                    "client_id":    str(r['bot__created_by__id']) if r['bot__created_by__id'] else None,
+                    "client_name":  r['bot__created_by__username'],
+                    "client_email": r['bot__created_by__email'],
+                    "workflow_count":  r['workflow_count'],
+                    "completed":       r['completed'],
+                    "failed":          r['failed'],
+                    "total_actions":   r['total_actions'] or 0,
+                }
+                for r in wf_by_bot
+            ],
+            "by_client": [
+                {
+                    "client_id":      str(r['created_by__id']),
+                    "client_name":    r['created_by__username'],
+                    "client_email":   r['created_by__email'],
+                    "workflow_count": r['workflow_count'],
+                    "completed":      r['completed'],
+                    "failed":         r['failed'],
+                    "saved":          r['saved'],
+                    "total_actions":  r['total_actions'] or 0,
+                }
+                for r in wf_by_client
+            ],
+            "recent": [
+                {
+                    "id":             str(r['id']),
+                    "name":           r['workflow_name'],
+                    "status":         r['status'],
+                    "action_count":   r['action_count'],
+                    "last_executed":  r['last_executed'].isoformat() if r['last_executed'] else None,
+                    "created_at":     r['created_at'].isoformat(),
+                    "bot_id":         str(r['bot__id']) if r['bot__id'] else None,
+                    "bot_name":       r['bot__name'],
+                    "client_id":      str(r['created_by__id']),
+                    "client_name":    r['created_by__username'],
+                    "client_email":   r['created_by__email'],
+                    "report_status":  r['report__status'],
+                    "execution_time": r['report__execution_time'],
+                    "report_executed_at": r['report__executed_at'].isoformat() if r['report__executed_at'] else None,
+                }
+                for r in recent_workflows
+            ],
+        }
+
+        # ── Notifications ────────────────────────────────────────────────────
+        # FIX: explicit isoformat() for datetime serialization
+        notif_qs = Notification.objects.filter(user=user)
+        recent_notifs = [
+            {
+                **n,
+                "created_at": n["created_at"].isoformat() if n["created_at"] else None,
+            }
+            for n in notif_qs.order_by('-created_at')[:5].values(
+                'id', 'title', 'message', 'notification_type', 'is_read', 'created_at'
+            )
+        ]
         notifications = {
             "unread_count": notif_qs.filter(is_read=False).count(),
-            "recent": list(recent_notifs),
+            "recent": recent_notifs,
         }
 
         response = {
-            "bots": bots,
-            "executions": executions,
-            "budget": budget,
-            "billing": billing,
-            "bugs": bugs,
-            "requests": requests_data,
+            "bots":          bots,
+            "executions":    executions,
+            "budget":        budget,
+            "billing":       billing,
+            "bugs":          bugs,
+            "requests":      requests_data,
+            "workflows":     workflows,
             "notifications": notifications,
         }
         if users_roles:
             response["users_roles"] = users_roles
+
         return Response(response)
