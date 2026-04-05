@@ -42,8 +42,26 @@ def trigger_jenkins_on_queued(sender, instance, created, **kwargs):
     if result['success']:
         report.status = 'queued'
         print(f"✅ Workflow {instance.id} queued successfully")
+        # Mark linked Execution as running
+        execution_id = (instance.metadata or {}).get('execution_id')
+        if execution_id:
+            from api.Executions.model import Executions
+            from django.utils import timezone
+            Executions.objects.filter(id=execution_id).update(
+                status='running',
+                started_at=timezone.now(),
+            )
     else:
         report.status = 'failed'
         print(f"❌ Workflow {instance.id} failed: {result.get('error')}")
+        # Mark linked Execution as failed
+        execution_id = (instance.metadata or {}).get('execution_id')
+        if execution_id:
+            from api.Executions.model import Executions
+            from django.utils import timezone
+            Executions.objects.filter(id=execution_id).update(
+                status='failed',
+                ended_at=timezone.now(),
+            )
 
     report.save(update_fields=['status'])

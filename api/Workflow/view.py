@@ -136,14 +136,31 @@ class ExecuteWorkflowView(APIView):
                 'next_step': 'Please top up your billing.'
             }, status=402)
 
-        # All checks passed — queue the workflow
+        # All checks passed — create Execution record + queue the workflow
+        from api.Executions.model import Executions
+
+        execution = Executions.objects.create(
+            bot=bot,
+            request=approved_request,
+            executed_by=user,
+            status='queued',
+        )
+
         workflow.status = 'queued'
         workflow.save(update_fields=['status'])
 
-        report, _ = WorkflowReport.objects.get_or_create(workflow=workflow)
+        report, _ = WorkflowReport.objects.get_or_create(
+            workflow=workflow,
+            defaults={'status': 'queued'}
+        )
+        # Link execution id into report metadata so Jenkins callback can update it
+        workflow.metadata = {**(workflow.metadata or {}), 'execution_id': str(execution.id)}
+        workflow.save(update_fields=['metadata'])
+
         return Response({
             'status': 'queued',
-            'execution_id': str(report.id),
+            'execution_id': str(execution.id),
+            'report_id': str(report.id),
             'bot': bot.name,
             'cost': str(cost),
             'balance_after': str(billing.balance_remaining - cost),
@@ -182,9 +199,20 @@ class WorkflowReportView(APIView):
 
         report.save()
 
-        workflow.status = data.get('status', 'completed')
+        final_status = data.get('status', 'completed')
+        workflow.status = final_status
         workflow.last_executed = timezone.now()
         workflow.save(update_fields=['status', 'last_executed'])
+
+        # Update the linked Execution record so /api/v1/executions/ reflects reality
+        execution_id = (workflow.metadata or {}).get('execution_id')
+        if execution_id:
+            from api.Executions.model import Executions
+            exec_status = 'success' if final_status == 'completed' else 'failed'
+            Executions.objects.filter(id=execution_id).update(
+                status=exec_status,
+                ended_at=timezone.now(),
+            )
 
         return Response({
             'status': 'received',

@@ -55,21 +55,91 @@ class GetDashboard(APIView):
         bots = {"total": bot_qs.count(), **bot_status}
 
         # ── Executions ───────────────────────────────────────────────────────
-        # FIX: scope by allotted bots for regular users, not just executed_by
-        exec_qs = (
-            Executions.objects.all() if is_super
-            else Executions.objects.filter(
-                Q(executed_by=user) | Q(bot__allotments__user=user)
-            ).distinct()
-        )
+        # Mirror exact 3-tier scoping from ExecutionsViewset
+        if is_super:
+            exec_qs = Executions.objects.all()
+        else:
+            groups = [g.lower() for g in user.groups.values_list('name', flat=True)]
+            if 'manager' in groups:
+                from api.UserProfile.model import UserProfile
+                client_ids = UserProfile.objects.filter(created_by=user).values_list('user_id', flat=True)
+                exec_qs = Executions.objects.filter(executed_by_id__in=client_ids)
+            else:
+                exec_qs = Executions.objects.filter(executed_by=user)
+
         exec_agg = exec_qs.aggregate(
-            success=Count('id', filter=Q(status='success')),
-            failed=Count('id', filter=Q(status='failed')),
-            running=Count('id', filter=Q(status='running')),
-            queued=Count('id', filter=Q(status='queued')),
+            success=Count('id',   filter=Q(status='success')),
+            failed=Count('id',    filter=Q(status='failed')),
+            running=Count('id',   filter=Q(status='running')),
+            queued=Count('id',    filter=Q(status='queued')),
             cancelled=Count('id', filter=Q(status='cancelled')),
         )
-        executions = {"total": exec_qs.count(), **exec_agg}
+
+        exec_by_bot = list(
+            exec_qs
+            .values('bot__id', 'bot__name')
+            .annotate(
+                total=Count('id'),
+                success=Count('id',   filter=Q(status='success')),
+                failed=Count('id',    filter=Q(status='failed')),
+                running=Count('id',   filter=Q(status='running')),
+                queued=Count('id',    filter=Q(status='queued')),
+                cancelled=Count('id', filter=Q(status='cancelled')),
+            )
+            .order_by('-total')
+        )
+
+        recent_executions = list(
+            exec_qs
+            .order_by('-created_at')[:10]
+            .values(
+                'id', 'status', 'started_at', 'ended_at', 'created_at',
+                'bot__id', 'bot__name',
+                'request__id', 'request__title',
+                'executed_by__id', 'executed_by__username', 'executed_by__email',
+            )
+        )
+
+        executions = {
+            "total": exec_qs.count(),
+            "by_status": {
+                "success":   exec_agg['success'],
+                "failed":    exec_agg['failed'],
+                "running":   exec_agg['running'],
+                "queued":    exec_agg['queued'],
+                "cancelled": exec_agg['cancelled'],
+            },
+            "by_bot": [
+                {
+                    "bot_id":    str(r['bot__id']),
+                    "bot_name":  r['bot__name'],
+                    "total":     r['total'],
+                    "success":   r['success'],
+                    "failed":    r['failed'],
+                    "running":   r['running'],
+                    "queued":    r['queued'],
+                    "cancelled": r['cancelled'],
+                }
+                for r in exec_by_bot
+            ],
+            "recent": [
+                {
+                    "id":                str(r['id']),
+                    "status":            r['status'],
+                    "bot_id":            str(r['bot__id']),
+                    "bot_name":          r['bot__name'],
+                    "request_id":        str(r['request__id']) if r['request__id'] else None,
+                    "request_title":     r['request__title'],
+                    "executed_by_id":    str(r['executed_by__id']),
+                    "executed_by":       r['executed_by__username'],
+                    "executed_by_email": r['executed_by__email'],
+                    "started_at":        r['started_at'].isoformat() if r['started_at'] else None,
+                    "ended_at":          r['ended_at'].isoformat() if r['ended_at'] else None,
+                    "created_at":        r['created_at'].isoformat(),
+                }
+                for r in recent_executions
+            ],
+        }
 
         # ── Budget ───────────────────────────────────────────────────────────
         budget_qs = Budget.objects.all() if is_super else Budget.objects.filter(user=user)
