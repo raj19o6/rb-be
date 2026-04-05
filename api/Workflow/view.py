@@ -25,16 +25,27 @@ class SaveWorkflowView(APIView):
             if not bot:
                 return Response({'error': 'Bot not found.'}, status=400)
 
-        workflow = Workflow.objects.create(
-            bot=bot,
-            workflow_name=data.get('workflowName'),
-            session_id=data.get('sessionId'),
-            actions=data.get('actions', []),
-            metadata=data.get('metadata', {}),
-            recorded_at=data.get('recordedAt'),
-            action_count=data.get('actionCount', 0),
-            created_by=request.user,
-        )
+        try:
+            workflow = Workflow.objects.create(
+                bot=bot,
+                workflow_name=data.get('workflowName'),
+                session_id=data.get('sessionId'),
+                actions=data.get('actions', []),
+                metadata=data.get('metadata', {}),
+                recorded_at=data.get('recordedAt'),
+                action_count=data.get('actionCount', 0),
+                created_by=request.user,
+            )
+        except Exception:
+            # session_id already exists — update the existing workflow instead
+            workflow = Workflow.objects.get(session_id=data.get('sessionId'))
+            workflow.workflow_name = data.get('workflowName', workflow.workflow_name)
+            workflow.actions = data.get('actions', workflow.actions)
+            workflow.action_count = data.get('actionCount', workflow.action_count)
+            workflow.metadata = data.get('metadata', workflow.metadata)
+            workflow.bot = bot or workflow.bot
+            workflow.status = 'saved'
+            workflow.save()
         return Response({
             'workflow_id': str(workflow.id),
             'user_id': str(request.user.id),
@@ -328,22 +339,28 @@ class ListWorkflowsView(APIView):
 
     def get(self, request):
         user = request.user
-        qs = Workflow.objects.select_related('report').all() if user.is_superuser \
-            else Workflow.objects.select_related('report').filter(created_by=user)
-
-        # Manager sees all client workflows
         groups = [g.lower() for g in user.groups.values_list('name', flat=True)]
-        if not user.is_superuser and 'manager' in groups:
+
+        if user.is_superuser:
+            qs = Workflow.objects.select_related('bot', 'created_by', 'report').all()
+        elif 'manager' in groups:
             from api.UserProfile.model import UserProfile
             client_ids = UserProfile.objects.filter(created_by=user).values_list('user_id', flat=True)
-            qs = Workflow.objects.select_related('report').filter(created_by_id__in=client_ids)
+            qs = Workflow.objects.select_related('bot', 'created_by', 'report').filter(
+                created_by_id__in=client_ids
+            )
+        else:
+            qs = Workflow.objects.select_related('bot', 'created_by', 'report').filter(
+                created_by=user
+            )
 
         workflows = []
         for wf in qs.order_by('-created_at'):
             summary = {}
             success_rate = None
             try:
-                summary = wf.report.report_json.get('summary', {})
+                rj = wf.report.report_json or {}
+                summary = rj.get('summary', {})
                 total = summary.get('total', 0)
                 passed = summary.get('passed', 0)
                 success_rate = round((passed / total) * 100, 1) if total else None
@@ -351,20 +368,20 @@ class ListWorkflowsView(APIView):
                 pass
 
             workflows.append({
-                'id': str(wf.id),
-                'name': wf.workflow_name,
-                'user_id': str(wf.created_by.id),
-                'username': wf.created_by.username,
-                'session_id': wf.session_id,
-                'actions': wf.actions,
-                'metadata': wf.metadata,
-                'recorded_at': wf.recorded_at,
-                'action_count': wf.action_count,
-                'created_at': wf.created_at,
+                'id':            str(wf.id),
+                'name':          wf.workflow_name,
+                'user_id':       str(wf.created_by.id),
+                'username':      wf.created_by.username,
+                'bot_id':        str(wf.bot.id) if wf.bot else None,
+                'bot_name':      wf.bot.name if wf.bot else None,
+                'session_id':    wf.session_id,
+                'action_count':  wf.action_count,
+                'status':        wf.status,
                 'last_executed': wf.last_executed,
-                'status': wf.status,
-                'success_rate': success_rate,
+                'created_at':    wf.created_at,
+                'success_rate':  success_rate,
+                'has_report':    hasattr(wf, 'report') and wf.report is not None,
             })
 
-        return Response({'workflows': workflows})
+        return Response({'count': len(workflows), 'workflows': workflows})
 
