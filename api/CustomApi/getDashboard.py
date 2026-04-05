@@ -98,22 +98,55 @@ class GetDashboard(APIView):
         billing = {k: float(v) if v else 0 for k, v in billing_agg.items()}
 
         # ── Bugs ─────────────────────────────────────────────────────────────
-        # FIX: include all statuses for full picture
         bugs_qs = Bugs.objects.all() if is_super else Bugs.objects.filter(
             Q(reported_by=user) | Q(assigned_to=user)
-        )
+        ).distinct()
+
         bugs_agg = bugs_qs.aggregate(
             open=Count('id', filter=Q(status='open')),
             in_progress=Count('id', filter=Q(status='in_progress')),
             resolved=Count('id', filter=Q(status='resolved')),
             closed=Count('id', filter=Q(status='closed')),
-            low=Count('id', filter=Q(severity='low', status__in=['open', 'in_progress'])),
-            medium=Count('id', filter=Q(severity='medium', status__in=['open', 'in_progress'])),
-            high=Count('id', filter=Q(severity='high', status__in=['open', 'in_progress'])),
+            # open+in_progress severity breakdown
+            low=Count('id',      filter=Q(severity='low',      status__in=['open', 'in_progress'])),
+            medium=Count('id',   filter=Q(severity='medium',   status__in=['open', 'in_progress'])),
+            high=Count('id',     filter=Q(severity='high',     status__in=['open', 'in_progress'])),
             critical=Count('id', filter=Q(severity='critical', status__in=['open', 'in_progress'])),
+            # per-bot bug counts
         )
+
+        # Bugs grouped by bot
+        bugs_by_bot = list(
+            bugs_qs
+            .values('bot__id', 'bot__name')
+            .annotate(
+                total=Count('id'),
+                open=Count('id',      filter=Q(status='open')),
+                in_progress=Count('id', filter=Q(status='in_progress')),
+                resolved=Count('id',  filter=Q(status='resolved')),
+                critical=Count('id',  filter=Q(severity='critical', status__in=['open', 'in_progress'])),
+                high=Count('id',      filter=Q(severity='high',     status__in=['open', 'in_progress'])),
+            )
+            .order_by('-total')
+        )
+
+        # Recent open/in_progress bugs with full detail
+        recent_bugs = list(
+            bugs_qs
+            .filter(status__in=['open', 'in_progress'])
+            .order_by('-created_at')[:10]
+            .values(
+                'id', 'title', 'severity', 'status',
+                'bot__id', 'bot__name',
+                'reported_by__id', 'reported_by__username', 'reported_by__email',
+                'assigned_to__id', 'assigned_to__username', 'assigned_to__email',
+                'created_at', 'updated_at',
+            )
+        )
+
         bugs = {
             "total": bugs_qs.count(),
+            "total_open": bugs_agg['open'] + bugs_agg['in_progress'],
             "by_status": {
                 "open":        bugs_agg['open'],
                 "in_progress": bugs_agg['in_progress'],
@@ -121,12 +154,43 @@ class GetDashboard(APIView):
                 "closed":      bugs_agg['closed'],
             },
             "open_by_severity": {
-                "low":      bugs_agg['low'],
-                "medium":   bugs_agg['medium'],
-                "high":     bugs_agg['high'],
                 "critical": bugs_agg['critical'],
+                "high":     bugs_agg['high'],
+                "medium":   bugs_agg['medium'],
+                "low":      bugs_agg['low'],
             },
-            "total_open": bugs_agg['open'] + bugs_agg['in_progress'],
+            "by_bot": [
+                {
+                    "bot_id":      str(r['bot__id']) if r['bot__id'] else None,
+                    "bot_name":    r['bot__name'] or "Unassigned",
+                    "total":       r['total'],
+                    "open":        r['open'],
+                    "in_progress": r['in_progress'],
+                    "resolved":    r['resolved'],
+                    "critical":    r['critical'],
+                    "high":        r['high'],
+                }
+                for r in bugs_by_bot
+            ],
+            "recent": [
+                {
+                    "id":                   str(r['id']),
+                    "title":                r['title'],
+                    "severity":             r['severity'],
+                    "status":               r['status'],
+                    "bot_id":               str(r['bot__id']) if r['bot__id'] else None,
+                    "bot_name":             r['bot__name'],
+                    "reported_by_id":       str(r['reported_by__id']),
+                    "reported_by":          r['reported_by__username'],
+                    "reported_by_email":    r['reported_by__email'],
+                    "assigned_to_id":       str(r['assigned_to__id']) if r['assigned_to__id'] else None,
+                    "assigned_to":          r['assigned_to__username'],
+                    "assigned_to_email":    r['assigned_to__email'],
+                    "created_at":           r['created_at'].isoformat(),
+                    "updated_at":           r['updated_at'].isoformat(),
+                }
+                for r in recent_bugs
+            ],
         }
 
         # ── Requests ─────────────────────────────────────────────────────────
