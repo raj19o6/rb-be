@@ -12,6 +12,7 @@ from api.ChangeMyPassword.view import ChangeMyPasswordView
 from api.ForgetPassword.view import PasswordResetRequestView
 from api.IsSuperUser.view import CheckUserType
 from api.CreateUser.views import CreateUserAPI
+from api.Register.view import RegisterView
 from api.HierarchyPermission.view import (
     AssignPermissionView, RevokePermissionView,
     MyPermissionsView, MyTeamView, AssignmentListView
@@ -105,6 +106,7 @@ urlpatterns = [
     path('passwordReset/', PasswordResetRequestView.as_view()),
     path('isSuperUser/', CheckUserType.as_view()),
     path('createUser/', CreateUserAPI.as_view()),
+    path('register/', RegisterView.as_view()),
     path('assignPermission/', AssignPermissionView.as_view()),
     path('revokePermission/', RevokePermissionView.as_view()),
     path('myPermissions/', MyPermissionsView.as_view()),
