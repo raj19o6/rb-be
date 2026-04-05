@@ -169,13 +169,15 @@ class ExecuteWorkflowView(APIView):
         workflow.save(update_fields=['metadata'])
 
         return Response({
-            'status': 'queued',
+            'status':       'queued',
+            'workflow_id':  str(workflow.id),
             'execution_id': str(execution.id),
-            'report_id': str(report.id),
-            'bot': bot.name,
-            'cost': str(cost),
+            'report_id':    str(report.id),
+            'bot':          bot.name,
+            'cost':         str(cost),
             'balance_after': str(billing.balance_remaining - cost),
-            'message': 'Workflow queued. Jenkins job triggered automatically.'
+            'report_url':   f'/api/v1/workflows/{workflow.id}/report/',
+            'message':      'Workflow queued. Jenkins job triggered automatically.'
         })
 
 
