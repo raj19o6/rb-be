@@ -11,4 +11,4 @@ class BillingSerializer(serializers.ModelSerializer):
         fields = ['id', 'user', 'username', 'bot', 'bot_name',
                   'amount', 'price_per_action', 'balance_remaining',
                   'status', 'billing_date', 'due_date', 'created_at']
-        read_only_fields = ['balance_remaining', 'created_at']
+        read_only_fields = ['created_at']
