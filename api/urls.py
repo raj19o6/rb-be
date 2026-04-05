@@ -29,8 +29,6 @@ from api.BotMaintainance.view import BotMaintainanceViewset
 from api.BotPrereq.view import BotPrereqViewset
 from api.BotFunctions.view import BotFunctionsViewset
 from api.Billing.view import BillingViewset
-from api.Executions.view import ExecutionsViewset
-from api.ExecutionReports.view import ExecutionReportsViewset
 from api.DocCategory.view import DocCategoryViewset
 from api.DocFields.view import DocFieldsViewset
 from api.FieldKeyMap.view import FieldKeyMapViewset
@@ -77,8 +75,6 @@ router.register('botmaintainance', BotMaintainanceViewset, basename='botmaintain
 router.register('botprereq', BotPrereqViewset, basename='botprereq')
 router.register('botfunctions', BotFunctionsViewset, basename='botfunctions')
 router.register('billing', BillingViewset, basename='billing')
-router.register('executions', ExecutionsViewset, basename='executions')
-router.register('executionreports', ExecutionReportsViewset, basename='executionreports')
 router.register('doccategory', DocCategoryViewset, basename='doccategory')
 router.register('docfields', DocFieldsViewset, basename='docfields')
 router.register('fieldkeymap', FieldKeyMapViewset, basename='fieldkeymap')

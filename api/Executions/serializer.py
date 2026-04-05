@@ -10,6 +10,6 @@ class ExecutionsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Executions
         fields = ['id', 'bot', 'bot_name', 'request', 'request_title',
-                  'executed_by', 'executed_by_username', 'status',
+                  'executed_by', 'executed_by_username', 'status', 'failure_reason',
                   'started_at', 'ended_at', 'created_at']
-        read_only_fields = ['executed_by', 'status', 'started_at', 'ended_at', 'created_at']
+        read_only_fields = ['executed_by', 'status', 'failure_reason', 'started_at', 'ended_at', 'created_at']

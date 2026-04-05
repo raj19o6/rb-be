@@ -23,6 +23,8 @@ class Workflow(models.Model):
     metadata = models.JSONField(blank=True, null=True)
     recorded_at = models.DateTimeField(null=True, blank=True)
     action_count = models.IntegerField(default=0)
+    execution_count = models.IntegerField(default=0)          # how many times executed
+    total_actions_consumed = models.IntegerField(default=0)   # action_count * execution_count
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='saved')
     last_executed = models.DateTimeField(null=True, blank=True)
     created_by = models.ForeignKey(

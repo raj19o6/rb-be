@@ -23,10 +23,8 @@ class ApiConfig(AppConfig):
         import api.BotPrereq.model
         import api.BotFunctions.model
 
-        # Billing / Executions group
+        # Billing group
         import api.Billing.model
-        import api.Executions.model
-        import api.ExecutionReports.model
 
         # Doc group
         import api.DocCategory.model
@@ -54,5 +52,4 @@ class ApiConfig(AppConfig):
         # Signals
         import api.Budget.signals
         import api.Payment.signals
-        import api.Executions.signals
         import api.Workflow.signals

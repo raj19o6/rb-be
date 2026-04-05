@@ -15,10 +15,8 @@ from api.BotMaintainance.model import BotMaintainance
 from api.BotPrereq.model import BotPrereq
 from api.BotFunctions.model import BotFunctions
 
-# Billing / Executions group
+# Billing group
 from api.Billing.model import Billing
-from api.Executions.model import Executions
-from api.ExecutionReports.model import ExecutionReports
 
 # Doc group
 from api.DocCategory.model import DocCategory
