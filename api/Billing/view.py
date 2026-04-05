@@ -21,8 +21,21 @@ class BillingViewset(ModelViewSet):
         if 'manager' in groups:
             from api.UserProfile.model import UserProfile
             client_ids = UserProfile.objects.filter(created_by=user).values_list('user_id', flat=True)
-            return Billing.objects.select_related('user', 'bot').filter(user_id__in=client_ids)
-        return Billing.objects.select_related('user', 'bot').filter(user=user)
+            return Billing.objects.select_related('user', 'bot').filter(
+                user_id__in=client_ids, status='paid'
+            )
+        # Regular clients only see their active paid billing with remaining balance
+        return Billing.objects.select_related('user', 'bot').filter(
+            user=user, status='paid'
+        )
+
+    @action(detail=False, methods=['post'], url_path='cleanup', permission_classes=[IsAuthenticated])
+    def cleanup(self, request):
+        """POST /api/v1/billing/cleanup/ — superuser removes garbage unpaid/zero records"""
+        if not request.user.is_superuser:
+            return Response({'error': 'Only superusers can run cleanup.'}, status=403)
+        deleted, _ = Billing.objects.filter(status='unpaid', amount=0).delete()
+        return Response({'deleted': deleted, 'message': f'{deleted} garbage billing record(s) removed.'})
 
     @action(detail=False, methods=['post'], url_path='top_up', permission_classes=[IsAuthenticated])
     def top_up(self, request):
